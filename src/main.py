@@ -97,6 +97,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('退出中……')  # 设置窗口标题
         self.profile.cookieStore().deleteAllCookies()
 
+"""获取标注(md)"""
+def get_mark(bookId):
+    res = ''
+    res = get_bookmarklist(bookId,is_all_chapter = 0)
+    #没有标注时给出提示
+    if res.strip() == '':
+        print('无标注')
+    return res
+
 if __name__=='__main__':
     print(cookie_file)
     #cookie文件存在时尝试从文件中读取cookie登录
@@ -133,14 +142,8 @@ if __name__=='__main__':
     bookId_dict = get_bookshelf(userVid=USERVID,list_as_shelf = False)
     print('**********************************************************')
     print_books_as_tree(userVid=USERVID)
-"""     while True:
-        print_books_as_tree(userVid=USERVID)
-        #提示输入书本id，正确输入后进入主函数
-        bookId = input('请输入书本ID：\n').strip()
-        if bookId in bookId_dict.keys():
-            y = main(bookId)
-            if y == 0:
-                break
-            elif y == 1:
-                continue """
+    bookId = '3300026067';
+    res = get_mark(bookId);
+    if res != None:
+        print(res);
                 

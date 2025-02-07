@@ -5,6 +5,12 @@ import requests
 from collections import defaultdict
 
 USERVID = 0
+level1 = '## '#(微信读书)一级标题
+level2 = '### '#二级标题
+level3 = '#### '#三级标题
+style1 = {'pre': "",   'suf': ""}#(微信读书)红色下划线
+style2 = {'pre': "**",   'suf': "**"}#橙色背景色
+style3 = {'pre': "",   'suf': ""}#蓝色波浪线
 
 headers_p = {
     'Connection': 'keep-alive',
@@ -147,3 +153,158 @@ def request_data(url):
     else:
         raise Exception(r.text)
     return data
+
+def set_chapter_level(level):
+    global level1,level2,level3
+    if level == 1:
+        return level1
+    elif level == 2:
+        return level2
+    elif level == 3:
+        return level3
+    
+def set_content_style(style,text):
+    global style1,style2,style3
+    if style == 0:#红色下划线
+        return style1['pre'] + text.strip() + style1['suf']
+    elif style == 1:#橙色背景色
+        return style2['pre'] + text.strip() + style2['suf']
+    elif style == 2:#蓝色波浪线
+        return style3['pre'] + text.strip() + style3['suf']
+    
+"""
+(按顺序)获取书中的标注(Markdown格式、标题分级、标注前后缀)
+"""
+def get_bookmarklist(bookId,is_all_chapter=1,chapterUid=-5):
+    """获取笔记返回md文本"""
+    #请求数据
+    url = "https://i.weread.qq.com/book/bookmarklist?bookId=" + bookId
+    data = request_data(url)
+    """处理数据，生成笔记"""
+    res = ''
+    res = get_md_str_from_data(data,is_all_chapter = is_all_chapter)
+    if res == '':#如果在书本中未找到标注
+        print('书中无标注/获取出错')
+        return ''
+    return res
+
+"""
+(按顺序)返回data数据中的标注(Markdown格式)，标注标题按级别设置，标注内容设置前后缀
+"""
+def get_md_str_from_data(data,is_all_chapter=1):
+    res = '\n'
+    bookId = data['book']['bookId']
+    #书本为公众号的情况
+    if '_' in bookId:
+        sorted_contents = get_sorted_contents_from_data(data)
+        #遍历章节
+        for chapter in sorted_contents:
+            #获得章节标题和标注
+            for title,marks in chapter.items():
+                res += '### ' + title + '\n\n'
+                #遍历标注
+                for mark in marks:
+                    res += mark[1] + '\n\n'
+        return res
+    #获取章节和标注
+    sorted_chapters = get_sorted_chapters(bookId)
+    sorted_contents = get_sorted_contents_from_data(data)
+    #遍历章节
+    for chapter in sorted_chapters:#chapter = (chapterUid,position,title)
+        #如果指明不输出所有标题
+        if is_all_chapter <= 0 and len(sorted_contents[chapter[0]]) == 0:
+            continue
+        #获取章节名
+        title = chapter[2]
+        res += set_chapter_level(chapter[1]) + title + '\n\n'
+        #遍历一章内的标注
+        for text in sorted_contents[chapter[0]]:#text = [position,style,markText]
+            res += set_content_style(text[1],text[2]) + '\n\n'
+    return res
+
+"""
+获取以章节id为键，以排序好的标注列表为值的字典：
+{"chapterUid":[[text_positon1,style1,"text1"],[text_positon2,style2,"text2"]...]}
+"""
+def get_sorted_contents_from_data(data):
+    bookId = data['book']['bookId']
+    #书本为公众号的情况{createTime:[[text_position1,'text1'],...]}
+    if '_' in bookId:
+        sorted_content = []  #
+        marks = defaultdict(list)   #{'refMpReviewId':[[position,'text'],...],...}
+        chapters = defaultdict(list) #{createTime:['reviewId','title'],...}
+        i = 0
+        for refMpInfos in data['refMpInfos']:
+            chapters[i] = [refMpInfos['reviewId'],refMpInfos['title']]
+            i = i + 1
+        #排序得到[(createTime1,['revieId1','title1']),...]
+        sorted_chapters = sorted(chapters.items())
+        #获得{createTime1:[[text_position1,'text1'],...],...}
+        for item in data['updated']:
+            marks[item['refMpReviewId']].append([int(item['range'].split('-')[0]),item['markText']])
+        #排序得到{'refMpReviewId':[[position1,'title1'],...]...}
+        sorted_marks = {}
+        for key in marks.keys():
+            sorted_marks[key] =  sorted(marks[key],key=lambda x: x[0])
+        #遍历章节
+        for chapter in sorted_chapters:
+            sorted_content.append({chapter[1][1]:sorted_marks[chapter[1][0]]})
+        return sorted_content
+        
+    contents = defaultdict(list)
+    """遍历所有标注并添加到字典储存起来"""
+    for item in data['updated']:#遍历标注
+        #获取标注的章节id
+        chapterUid = item['chapterUid']
+        #获取标注的文本内容
+        text = item['markText']
+        #获取标注开始位置用于标记位置
+        text_position = int(item['range'].split('-')[0])
+        text_style = item['style']
+        #以章节id为键，以章内标注构成的列表为值,获得{"chapterUid":{text_positon:"text"}}
+        contents[chapterUid].append([text_position,text_style,text])
+    """将每章内的标注按键值排序，得到sorted_contents = {"chapterUid":[[text_positon2,style2,"text2"],[text_positon1,style1,"text1"]...]}"""
+    sorted_contents = defaultdict(list)
+    for chapterUid in contents.keys():
+        #标注按位置排序，获得：
+        #{"chapterUid":[[text_positon1,style1,"text1"],[text_positon2,style2,"text2"]...]}
+        sorted_contents[chapterUid] = sorted(contents[chapterUid],key=lambda x: x[0])
+    return sorted_contents
+
+"""
+(按顺序)获取书中的章节：
+[(1, 1, '封面'), (2, 1, '版权信息'), (3, 1, '数字版权声明'), (4, 1, '版权声明'), (5, 1, '献给'), (6, 1, '前言'), (7, 1, '致谢')]
+"""
+def get_sorted_chapters(bookId):
+    if '_' in bookId:
+        print('公众号不支持输出目录')
+        return ''
+    url = "https://i.weread.qq.com/book/chapterInfos?" + "bookIds=" + bookId + "&synckeys=0"
+    data = request_data(url)
+    chapters = []
+    #遍历章节,章节在数据中是按顺序排列的，所以不需要另外排列
+    for item in data['data'][0]['updated']:
+        #判断item是否包含level属性。
+        try:
+            chapters.append((item['chapterUid'],item['level'],item['title']))
+        except:
+            chapters.append((item['chapterUid'],1,item['title']))
+    """chapters = [(1, 1, '封面'), (2, 1, '版权信息'), (3, 1, '数字版权声明'), (4, 1, '版权声明'), (5, 1, '献给'), (6, 1, '前言'), (7, 1, '致谢')]"""
+    return chapters
+
+
+"""
+获取书本信息(Markdown格式)
+"""
+def get_bookinfo(bookId):
+    if '_' in bookId:
+        print('公众号不支持书本信息')
+        return ''
+    """获取书的详情"""
+    url = "https://i.weread.qq.com/book/info?bookId=" + bookId
+    data = request_data(url)
+    bookinfo = [('title',data['title']),('author',data['author']),('category',data['category']),('introduction',data['intro']),('publisher',data['publisher'])]
+    res = '\n'
+    for item in bookinfo:
+        res += item[0] + '：' + item[1] + '\n\n'
+    return res
