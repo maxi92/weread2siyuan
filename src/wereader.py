@@ -175,7 +175,7 @@ def set_content_style(style,text):
 """
 (按顺序)获取书中的标注(Markdown格式、标题分级、标注前后缀)
 """
-def get_bookmarklist(bookId,is_all_chapter=1,chapterUid=-5):
+def get_bookmarklist(bookId,is_all_chapter=1):
     """获取笔记返回md文本"""
     #请求数据
     url = "https://i.weread.qq.com/book/bookmarklist?bookId=" + bookId
@@ -187,6 +187,20 @@ def get_bookmarklist(bookId,is_all_chapter=1,chapterUid=-5):
         print('书中无标注/获取出错')
         return ''
     return res
+
+"""
+获取章节信息和划线内容
+"""
+def getChaptersAndContents(bookId,is_all_chapter=1):
+    """获取笔记返回md文本"""
+    #请求数据
+    url = "https://i.weread.qq.com/book/bookmarklist?bookId=" + bookId
+    data = request_data(url)
+    """处理数据，生成笔记"""
+    #获取章节和标注
+    sorted_chapters = get_sorted_chapters(bookId)
+    sorted_contents = get_sorted_contents_from_data(data)
+    return sorted_chapters,sorted_contents
 
 """
 (按顺序)返回data数据中的标注(Markdown格式)，标注标题按级别设置，标注内容设置前后缀

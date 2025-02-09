@@ -7,6 +7,7 @@ from PyQt5.QtCore import QUrl
 from PyQt5.QtCore import Qt
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile
 from wereader import *
+from siyuan import *
 
 # 微信读书用户id
 USERVID = 0
@@ -139,11 +140,83 @@ if __name__=='__main__':
     
     
     #将书架按{'bookId1':"title1"...}的形式储存在字典中
-    bookId_dict = get_bookshelf(userVid=USERVID,list_as_shelf = False)
+    """     bookId_dict = get_bookshelf(userVid=USERVID,list_as_shelf = False)
     print('**********************************************************')
     print_books_as_tree(userVid=USERVID)
     bookId = '3300026067';
     res = get_mark(bookId);
     if res != None:
-        print(res);
+        print(res); 
+    """
+
+    sorted_chapters,sorted_contents = getChaptersAndContents('3300026067')
+    res = generate_markdown(sorted_chapters,sorted_contents,is_all_chapter=0);
+    print(res)
+
+    # 查找是否存在笔记本，若不存在则创建
+    notebook_id = get_notebook_id_by_name()
+    if not notebook_id:
+        notebook_id = create_notebook()
+        if not notebook_id:
+            print("无法创建笔记本")
+            sys.exit(0)
+
+    # 指定标题
+    title = "测试文档123"
+
+    # 查找是否存在指定标题的笔记
+    doc_info = search_docs_by_title(title)
+    if doc_info:
+        path = doc_info.get("path")
+        box = doc_info.get("box")
+        if path and box == notebook_id:
+            # 删除该笔记
+            remove_success = remove_doc(notebook_id, path)
+            if remove_success:
+                print(f"成功删除笔记: {title}")
+            else:
+                print(f"删除笔记失败: {title}")
+        else:
+            print(f"未找到笔记ID: {title}")
+    else:
+        print(f"未找到笔记: {title}")
+
+    # 创建一个名称为指定标题的笔记
+    book_name = title
+    md_content = "# 标题\n这是一个Markdown文档示例1。"
+    doc_id = create_doc_with_md(notebook_id, book_name, res)
+    if doc_id:
+        print(f"成功创建笔记: {title}, ID: {doc_id}")
+    else:
+        print(f"创建笔记失败: {title}")
+
+        """
+    根据doc_id获取文档内容，查找包含表格的div，并设置块属性。
+
+    参数:
+    - doc_id (str): 文档的唯一标识符（ID）。
+    """
+    # 获取文档内容
+    doc_content = get_doc_content(doc_id)
+    if not doc_content:
+        print(f"无法获取文档内容，doc_id: {doc_id}")
+        sys.exit(0)
+
+    # 查找包含表格的div
+    div_ids = find_divs_with_tables(doc_content)
+    if not div_ids:
+        print(f"未找到包含表格的div，doc_id: {doc_id}")
+        sys.exit(0)
+
+    # 设置块属性
+    results = set_block_attributes_for_ids(div_ids, 1400)
+    for result in results:
+        if result["success"]:
+            print(f"成功设置块属性，ID: {result['id']}")
+        else:
+            print(f"设置块属性失败，ID: {result['id']}, 错误信息: {result['msg']}")
+
+    
+
+    
                 
