@@ -140,6 +140,8 @@ if __name__=='__main__':
     
     """ 
     #将书架按{'bookId1':"title1"...}的形式储存在字典中
+    """     
+    """
     bookId_dict = get_bookshelf(userVid=USERVID,list_as_shelf = False)
     print('**********************************************************')
     print_books_as_tree(userVid=USERVID)
@@ -148,7 +150,8 @@ if __name__=='__main__':
     if res != None:
         print(res); 
     
-    sys.exit(0) """
+    sys.exit(0) 
+    """
 
     # 获取书籍信息
     book_info = get_bookinfo('24987062');
