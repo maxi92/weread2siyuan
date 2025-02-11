@@ -1,4 +1,7 @@
+import os
 import requests
+import tempfile
+from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
 # 预先设置好的token
@@ -207,57 +210,74 @@ def format_text(text, style):
     else:
         return text
 
-"""
-根据章节信息和书摘内容生成 markdown 格式字符串。
-
-参数:
-    - sorted_chapters: list, 每个元素为 (chapterUid, position, title)
-        其中 position 用于确定标题级别（1 对应 "#", 2 对应 "##" 等）
-    - sorted_contents: dict, key 为 chapterUid，value 为书摘列表，
-        每个书摘结构为 [text_position, style, markText]
-    - is_all_chapter: int, 如果 <= 0，则只输出有书摘内容的章节；如果 > 0，则输出所有章节
-    
-返回:
-    - str, 拼接好的 markdown 格式字符串
-"""
 def generate_markdown(sorted_chapters, sorted_contents, is_all_chapter=1):
+    """
+    根据章节信息和书摘内容生成包含完整章节结构的 markdown 格式字符串。
     
+    参数:
+        - sorted_chapters: list, 每个元素为 (chapterUid, level, title)，按照深度优先顺序排列
+        - sorted_contents: dict, key 为 chapterUid，value 为书摘列表，每个书摘为 [text_position, style, markText]
+        - is_all_chapter: int, 如果 <= 0，则只输出有书摘内容的章节；如果 > 0，则输出所有章节
+    返回:
+        - str, 拼接好的 markdown 格式字符串
+    """
     markdown_lines = []
-    
-    # 遍历所有章节
-    for chapter in sorted_chapters:
-        chapterUid, pos, title = chapter
-        
-        # 如果设置只输出有内容的章节，且当前章节没有书摘，则跳过
+    printed_ids = set()  # 记录已输出的章节ID
+
+    #把level+1，这样最后最高级标题为H2，更合适一点
+    sorted_chapters = [(chapterUid, level + 1, title) for chapterUid, level, title in sorted_chapters]
+
+    # 遍历所有章节（已按深度优先排序）
+    for i, chapter in enumerate(sorted_chapters):
+        chapterUid, level, title = chapter
+
+        # 如果只输出有内容的章节，且当前章节没有书摘，则跳过
         if is_all_chapter <= 0 and not sorted_contents.get(chapterUid):
             continue
-        
-        # 根据章节级别生成对应的 markdown 标题（例如 1 级用 "#", 2 级用 "##"）
-        markdown_lines.append("#" * pos + " " + title)
-        markdown_lines.append("")  # 添加空行
-        
-        # 获取当前章节的所有书摘内容
+
+        # 如果章节级别大于1，检查是否需要回溯输出未输出的祖先章节
+        if level > 2:
+            current_level = level - 1
+            ancestors = []
+            # 向上扫描，寻找所有祖先（即最近的、级别分别为 level-1, level-2, ... , 1 的章节）
+            for j in range(i - 1, -1, -1):
+                anc_uid, anc_level, anc_title = sorted_chapters[j]
+                if anc_level == current_level:
+                    ancestors.append((anc_uid, anc_level, anc_title))
+                    current_level -= 1
+                    if current_level == 0:
+                        break
+            ancestors.reverse()  # 保证从根到直接父章节的顺序
+            for anc_uid, anc_level, anc_title in ancestors:
+                if anc_uid not in printed_ids:
+                    markdown_lines.append("#" * anc_level + " " + anc_title)
+                    markdown_lines.append("")
+                    printed_ids.add(anc_uid)
+
+        # 输出当前章节标题（如果还未输出）
+        if chapterUid not in printed_ids:
+            markdown_lines.append("#" * level + " " + title)
+            markdown_lines.append("")
+            printed_ids.add(chapterUid)
+
+        # 获取当前章节的书摘内容
         chapter_contents = sorted_contents.get(chapterUid, [])
         if chapter_contents:
-            # 添加表格头及分隔行
             markdown_lines.append("| 序号 | 书摘内容 |")
             markdown_lines.append("| ---- | -------- |")
-            
-            # 遍历当前章节的书摘内容
             for idx, text_item in enumerate(chapter_contents, start=1):
                 _, style, text = text_item
-                # 对书摘文本进行格式化，并在开头添加两个中文全角空格
+                # 在书摘内容前添加两个中文全角空格，并使用 format_text 格式化
                 formatted_text = "　　" + format_text(text, style)
-                # 序号部分使用加粗 Markdown 格式
-                markdown_lines.append(f"| <strong>{idx}</strong> | {'　　' + format_text(text, style)} |")
-
+                # 将换行符替换为 <br> 后同时在新行开头插入两个中文全角空格
+                formatted_text = formatted_text.replace("\n", "<br>　　")
+                markdown_lines.append(f"| <strong>{idx}</strong> | {formatted_text} |")
             
             markdown_lines.append("")
         else:
-            # 如果章节没有书摘内容，可以添加提示文本
             markdown_lines.append("暂无书摘内容")
             markdown_lines.append("")
-    
+
     return "\n".join(markdown_lines)
 
 def remove_doc_by_id(doc_id):
@@ -445,6 +465,60 @@ def set_block_attributes_for_ids(id_array, width):
 
     return results
 
+def upload_image_from_url_fixed(image_url):
+    """
+    从给定的图片网址下载图片，并上传到指定的API接口，确保files作为一个数组传递。
+    
+    参数:
+    image_url (str): 图片的网址字符串。
+    
+    返回:
+    str: 成功上传后的图片路径（如果上传成功），否则返回None。
+    """
+    # 下载图片并保存到临时文件夹
+    response = requests.get(image_url)
+    if response.status_code != 200:
+        print(f"Failed to download image from {image_url}")
+        return None
+    
+    # 创建临时文件
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg", dir=tempfile.gettempdir()) as tmp_file:
+        tmp_file.write(response.content)
+        temp_file_path = tmp_file.name
+    
+    try:
+        # 准备上传文件的form-data，确保files是一个数组
+        files = [
+            ('assetsDirPath', (None, '/assets/')),  # text类型
+            ('files[]', (os.path.basename(urlparse(image_url).path), open(temp_file_path, 'rb'))),  # File类型，注意这里使用files[]
+        ]
+        
+        headers = {
+            'Authorization': f'token {token}'
+        }
+
+        print(files)
+        
+        # 发送POST请求
+        upload_response = requests.post('http://127.0.0.1:6806/api/asset/upload', headers=headers, files=files)
+        upload_response_json = upload_response.json()
+        print(upload_response_json)
+        
+        # 检查响应是否成功
+        if upload_response_json.get('code') == 0:
+            succ_map = upload_response_json.get('data', {}).get('succMap', {})
+            if succ_map:
+                # 返回第一个成功上传的文件路径
+                return next(iter(succ_map.values()))
+        else:
+            print(f"Upload failed: {upload_response_json.get('msg')}")
+            return None
+    finally:
+        # 删除临时文件
+        os.remove(temp_file_path)
+
+
+
 if __name__=='__main__':
     # 示例调用
     """ 
@@ -471,6 +545,7 @@ if __name__=='__main__':
     print(doc_id) 
     """
 
+    """     
     # 下面是示例数据
     sorted_chapters = [
         ("chap1", 1, "第一章 引言"),
@@ -498,4 +573,9 @@ if __name__=='__main__':
     markdown_output = generate_markdown(sorted_chapters, sorted_contents, is_all_chapter)
     
     # 输出到控制台，也可以将 markdown_output 保存到文件中
-    print(markdown_output)
+    print(markdown_output) 
+    """
+    
+    image_url = 'https://cdn.weread.qq.com/weread/cover/33/cpPlatform_6KREKi1aMoV88q4acZ9cVw/t7_cpPlatform_6KREKi1aMoV88q4acZ9cVw.jpg'
+    uploaded_path = upload_image_from_url_fixed(image_url)
+    print(uploaded_path)

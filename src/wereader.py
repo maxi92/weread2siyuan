@@ -317,8 +317,51 @@ def get_bookinfo(bookId):
     """获取书的详情"""
     url = "https://i.weread.qq.com/book/info?bookId=" + bookId
     data = request_data(url)
-    bookinfo = [('title',data['title']),('author',data['author']),('category',data['category']),('introduction',data['intro']),('publisher',data['publisher'])]
-    res = '\n'
-    for item in bookinfo:
-        res += item[0] + '：' + item[1] + '\n\n'
-    return res
+    
+    # 确定需要保留的键
+    keys_to_keep = ['title', 'author', 'intro', 'category', 'publisher', 'totalWords', 'cover']
+    
+    # 使用字典推导式来生成新的字典，只保留指定的键
+    new_book_info = {key: data[key] for key in keys_to_keep if key in data}
+    
+    # 检查'cover'是否在新字典中，如果存在则进行字符串替换
+    # 为了获取封面的高清图片
+    if 'cover' in new_book_info:
+        new_book_info['cover'] = new_book_info['cover'].replace('s_', 't7_')
+
+    return new_book_info
+
+def generate_markdown_table(new_book_info):
+    """
+    根据给定的书籍信息字典生成一个Markdown格式的表格字符串。
+
+    参数:
+        new_book_info (dict): 包含书籍信息的字典，至少包含 author、category、publisher、totalWords、intro 键。
+
+    返回:
+        str: 一个Markdown格式的字符串，展示作者、分类、出版社、字数、简介等信息。
+             简介部分的换行符会被替换为 '<br>　　'，即换行后带有两个中文全角空格，
+             以适应Markdown表格中的多行文本显示。
+    """
+    # 定义要展示的信息及其对应的中文标签
+    info_to_display = [
+        ('author', '作者'),
+        ('category', '分类'),
+        ('publisher', '出版社'),
+        ('totalWords', '字数'),
+        ('intro', '简介')
+    ]
+
+    # 开始构建Markdown表格字符串
+    markdown_str = '| 中文标签 | 内容 |\n| --- | --- |\n'
+
+    for key, label in info_to_display:
+        if key in new_book_info:
+            if key == 'intro':
+                # 为简介字段添加两个中文全角空格，并将换行符替换为 '<br>　　'
+                value = "　　" + new_book_info[key].replace("\n", "<br>　　")
+            else:
+                value = new_book_info[key]
+            markdown_str += f'| {label} | {value} |\n'
+
+    return markdown_str

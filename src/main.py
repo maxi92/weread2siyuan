@@ -138,20 +138,29 @@ if __name__=='__main__':
         window.show() # 显示窗口
         app.exec_() # 运行应用，并监听事件
     
-    
+    """ 
     #将书架按{'bookId1':"title1"...}的形式储存在字典中
-    """     bookId_dict = get_bookshelf(userVid=USERVID,list_as_shelf = False)
+    bookId_dict = get_bookshelf(userVid=USERVID,list_as_shelf = False)
     print('**********************************************************')
     print_books_as_tree(userVid=USERVID)
     bookId = '3300026067';
     res = get_mark(bookId);
     if res != None:
         print(res); 
-    """
+    
+    sys.exit(0) """
 
-    sorted_chapters,sorted_contents = getChaptersAndContents('3300026067')
+    # 获取书籍信息
+    book_info = get_bookinfo('24987062');
+
+    book_info_markdown = generate_markdown_table(book_info);
+    #print(book_info_markdown)
+
+    sorted_chapters,sorted_contents = getChaptersAndContents('24987062')
     res = generate_markdown(sorted_chapters,sorted_contents,is_all_chapter=0);
     print(res)
+
+    res = book_info_markdown + '\n' + res
 
     # 查找是否存在笔记本，若不存在则创建
     notebook_id = get_notebook_id_by_name()
@@ -162,7 +171,7 @@ if __name__=='__main__':
             sys.exit(0)
 
     # 指定标题
-    title = "测试文档123"
+    title = book_info["title"]
 
     # 查找是否存在指定标题的笔记
     doc_info = search_docs_by_title(title)
