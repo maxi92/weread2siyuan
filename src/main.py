@@ -156,6 +156,8 @@ if __name__=='__main__':
     # 获取书籍信息
     book_info = get_bookinfo('24987062');
 
+    cover = book_info['cover'];
+    book_info['cover_image_path'] = upload_image_from_url(cover);
     book_info_markdown = generate_markdown_table(book_info);
     #print(book_info_markdown)
 

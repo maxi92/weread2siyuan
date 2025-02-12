@@ -465,9 +465,9 @@ def set_block_attributes_for_ids(id_array, width):
 
     return results
 
-def upload_image_from_url_fixed(image_url):
+def upload_image_from_url(image_url):
     """
-    从给定的图片网址下载图片，并上传到指定的API接口，确保files作为一个数组传递。
+    从给定的图片网址下载图片，并上传到指定的API接口。
     
     参数:
     image_url (str): 图片的网址字符串。
@@ -487,32 +487,31 @@ def upload_image_from_url_fixed(image_url):
         temp_file_path = tmp_file.name
     
     try:
-        # 准备上传文件的form-data，确保files是一个数组
-        files = [
-            ('assetsDirPath', (None, '/assets/')),  # text类型
-            ('files[]', (os.path.basename(urlparse(image_url).path), open(temp_file_path, 'rb'))),  # File类型，注意这里使用files[]
-        ]
-        
-        headers = {
-            'Authorization': f'token {token}'
-        }
-
-        print(files)
-        
-        # 发送POST请求
-        upload_response = requests.post('http://127.0.0.1:6806/api/asset/upload', headers=headers, files=files)
-        upload_response_json = upload_response.json()
-        print(upload_response_json)
-        
-        # 检查响应是否成功
-        if upload_response_json.get('code') == 0:
-            succ_map = upload_response_json.get('data', {}).get('succMap', {})
-            if succ_map:
-                # 返回第一个成功上传的文件路径
-                return next(iter(succ_map.values()))
-        else:
-            print(f"Upload failed: {upload_response_json.get('msg')}")
-            return None
+        # 使用上下文管理器确保文件句柄被正确关闭
+        with open(temp_file_path, 'rb') as file_handle:
+            # 准备上传文件的form-data，确保file[]是一个数组
+            files = [
+                ('assetsDirPath', (None, '/assets/')),  # text类型
+                ('file[]', (os.path.basename(urlparse(image_url).path), file_handle)),  # File类型，注意这里使用file[]
+            ]
+            
+            headers = {
+                'Authorization': f'token {token}'
+            }
+            
+            # 发送POST请求
+            upload_response = requests.post('http://127.0.0.1:6806/api/asset/upload', headers=headers, files=files)
+            upload_response_json = upload_response.json()
+            
+            # 检查响应是否成功
+            if upload_response_json.get('code') == 0:
+                succ_map = upload_response_json.get('data', {}).get('succMap', {})
+                if succ_map:
+                    # 返回第一个成功上传的文件路径
+                    return next(iter(succ_map.values()))
+            else:
+                print(f"Upload failed: {upload_response_json.get('msg')}")
+                return None
     finally:
         # 删除临时文件
         os.remove(temp_file_path)
@@ -577,5 +576,5 @@ if __name__=='__main__':
     """
     
     image_url = 'https://cdn.weread.qq.com/weread/cover/33/cpPlatform_6KREKi1aMoV88q4acZ9cVw/t7_cpPlatform_6KREKi1aMoV88q4acZ9cVw.jpg'
-    uploaded_path = upload_image_from_url_fixed(image_url)
+    uploaded_path = upload_image_from_url(image_url)
     print(uploaded_path)

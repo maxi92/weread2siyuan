@@ -331,7 +331,7 @@ def get_bookinfo(bookId):
 
     return new_book_info
 
-def generate_markdown_table(new_book_info):
+def generate_markdown_table(new_book_info): 
     """
     根据给定的书籍信息字典生成一个Markdown格式的表格字符串。
 
@@ -352,9 +352,18 @@ def generate_markdown_table(new_book_info):
         ('intro', '简介')
     ]
 
+    # 获取封面图片路径
+    cover_image_path = new_book_info.get('cover_image_path', '')
+
     # 开始构建Markdown表格字符串
     markdown_str = '| 中文标签 | 内容 |\n| --- | --- |\n'
 
+    # 增加封面图片行，使用动态路径
+    markdown_str += f'| <strong>封面</strong> | ![封面]({cover_image_path}) |\n'
+
+
+
+    # 遍历展示书籍信息
     for key, label in info_to_display:
         if key in new_book_info:
             if key == 'intro':
@@ -362,6 +371,11 @@ def generate_markdown_table(new_book_info):
                 value = "　　" + new_book_info[key].replace("\n", "<br>　　")
             else:
                 value = new_book_info[key]
-            markdown_str += f'| {label} | {value} |\n'
+            
+            # 使第一列（标签）加粗，第二列（内容）变为斜体
+            markdown_str += f'| <strong>{label}</strong> | {value} |\n'
+
+    print('**********************************************************')
+    print(markdown_str)
 
     return markdown_str
