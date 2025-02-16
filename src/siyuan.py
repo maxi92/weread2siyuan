@@ -3,6 +3,8 @@ import requests
 import tempfile
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
+from collections import defaultdict
+
 
 # 预先设置好的token
 token = "your-token"
@@ -203,28 +205,54 @@ def create_doc_with_md(notebook_id, book_name, md_content):
 """
 def format_text(text, style):
 
-    if style == 0:
+   """  if style == 0:
         return f"*{text}*"
     elif style == 2:
         return f"**{text}**"
     else:
-        return text
+        return text """
+   
+   return text;
 
-def generate_markdown(sorted_chapters, sorted_contents, is_all_chapter=1):
+def generate_markdown(sorted_chapters, sorted_contents, sorted_thoughts, is_all_chapter=1):
     """
-    根据章节信息和书摘内容生成包含完整章节结构的 markdown 格式字符串。
+    根据章节信息、书摘内容和想法生成包含完整章节结构的 markdown 格式字符串。
     
     参数:
         - sorted_chapters: list, 每个元素为 (chapterUid, level, title)，按照深度优先顺序排列
         - sorted_contents: dict, key 为 chapterUid，value 为书摘列表，每个书摘为 [text_position, style, markText]
+        - sorted_thoughts: list, 按章节包含原文和想法的排序信息，每个元素为 (chapterUid, [(position, abstract, content)])
         - is_all_chapter: int, 如果 <= 0，则只输出有书摘内容的章节；如果 > 0，则输出所有章节
+        
     返回:
         - str, 拼接好的 markdown 格式字符串
     """
+    # 合并 sorted_contents 和 sorted_thoughts
+    merged_thoughts = defaultdict(list)
+
+    for chapterUid, content_items in sorted_contents.items():
+        for text_position, style, markText in content_items:
+            merged_thoughts[chapterUid].append((text_position, markText, "", style))  # markText为书摘内容，style为样式
+
+    for chapterUid, thought_items in sorted_thoughts:
+        for position, abstract, content in thought_items:
+            # 如果已存在相同的 markText，则去重，保留 sorted_thoughts
+            existing_items = merged_thoughts.get(chapterUid, [])
+            for idx, (text_position, existing_markText, _, _) in enumerate(existing_items):
+                if existing_markText == abstract:
+                    merged_thoughts[chapterUid][idx] = (position, abstract, content, existing_items[idx][3])  # 替换为 sorted_thoughts 内容
+                    break
+            else:
+                merged_thoughts[chapterUid].append((position, abstract, content, ""))  # 如果没有相同的 markText，就新增
+
+    # 对每个章节的内容按 position 排序
+    for chapterUid in merged_thoughts:
+        merged_thoughts[chapterUid] = sorted(merged_thoughts[chapterUid], key=lambda x: x[0])
+
     markdown_lines = []
     printed_ids = set()  # 记录已输出的章节ID
 
-    #把level+1，这样最后最高级标题为H2，更合适一点
+    # 把level+1，这样最后最高级标题为H2，更合适一点
     sorted_chapters = [(chapterUid, level + 1, title) for chapterUid, level, title in sorted_chapters]
 
     # 遍历所有章节（已按深度优先排序）
@@ -232,7 +260,7 @@ def generate_markdown(sorted_chapters, sorted_contents, is_all_chapter=1):
         chapterUid, level, title = chapter
 
         # 如果只输出有内容的章节，且当前章节没有书摘，则跳过
-        if is_all_chapter <= 0 and not sorted_contents.get(chapterUid):
+        if is_all_chapter <= 0 and chapterUid not in merged_thoughts:
             continue
 
         # 如果章节级别大于1，检查是否需要回溯输出未输出的祖先章节
@@ -260,25 +288,34 @@ def generate_markdown(sorted_chapters, sorted_contents, is_all_chapter=1):
             markdown_lines.append("")
             printed_ids.add(chapterUid)
 
-        # 获取当前章节的书摘内容
-        chapter_contents = sorted_contents.get(chapterUid, [])
+        # 获取当前章节的合并内容
+        chapter_contents = merged_thoughts.get(chapterUid, [])
+
         if chapter_contents:
-            markdown_lines.append("| 序号 | 书摘内容 |")
-            markdown_lines.append("| ---- | -------- |")
-            for idx, text_item in enumerate(chapter_contents, start=1):
-                _, style, text = text_item
+            markdown_lines.append("| 序号 | 书摘内容 | 想法 |")
+            markdown_lines.append("| ---- | -------- | ---- |")
+
+            # 遍历每个合并后的条目
+            for idx, (position, abstract, content, style) in enumerate(chapter_contents, start=1):
                 # 在书摘内容前添加两个中文全角空格，并使用 format_text 格式化
-                formatted_text = "　　" + format_text(text, style)
+                formatted_text = "　　" + format_text(abstract, style) if abstract else ""
                 # 将换行符替换为 <br> 后同时在新行开头插入两个中文全角空格
-                formatted_text = formatted_text.replace("\n", "<br>　　")
-                markdown_lines.append(f"| <strong>{idx}</strong> | {formatted_text} |")
+                formatted_text = formatted_text.replace("\r\n", "<br>　　").replace("\n", "<br>　　")
+                # 在想法内容前添加两个中文全角空格，并使用 <em> 标签格式化
+                thought_text = f"　　<em>{content}</em>" if content else ""
+                # 将换行符替换为 <br> 后同时在新行开头插入两个中文全角空格
+                thought_text = thought_text.replace("\r\n", "<br>　　").replace("\n", "<br>　　")
+
+                markdown_lines.append(f"| <strong>{idx}</strong> | {formatted_text} | {thought_text} |")
             
             markdown_lines.append("")
         else:
-            markdown_lines.append("暂无书摘内容")
+            markdown_lines.append("暂无书摘或想法内容")
             markdown_lines.append("")
 
     return "\n".join(markdown_lines)
+
+
 
 def remove_doc_by_id(doc_id):
 

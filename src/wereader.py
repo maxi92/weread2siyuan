@@ -3,6 +3,10 @@ import os
 import sys
 import requests
 from collections import defaultdict
+from urllib3.exceptions import InsecureRequestWarning  # 直接从 urllib3 导入
+
+# 禁用 InsecureRequestWarning 警告
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 USERVID = 0
 level1 = '## '#(微信读书)一级标题
@@ -319,7 +323,7 @@ def get_bookinfo(bookId):
     data = request_data(url)
     
     # 确定需要保留的键
-    keys_to_keep = ['title', 'author', 'intro', 'category', 'publisher', 'totalWords', 'cover']
+    keys_to_keep = ['title', 'author', 'intro', 'category', 'publisher', 'totalWords', 'cover','finished']
     
     # 使用字典推导式来生成新的字典，只保留指定的键
     new_book_info = {key: data[key] for key in keys_to_keep if key in data}
@@ -368,7 +372,7 @@ def generate_markdown_table(new_book_info):
         if key in new_book_info:
             if key == 'intro':
                 # 为简介字段添加两个中文全角空格，并将换行符替换为 '<br>　　'
-                value = "　　" + new_book_info[key].replace("\n", "<br>　　")
+                value = "　　" + new_book_info[key].replace("\r\n", "<br>　　").replace("\n", "<br>　　")
             else:
                 value = new_book_info[key]
             
@@ -379,3 +383,88 @@ def generate_markdown_table(new_book_info):
     print(markdown_str)
 
     return markdown_str
+
+def get_mythought(bookId):
+    """
+    获取微信读书中的书籍的章节想法和原文内容，将原文和想法分开存储并绑定。
+
+    参数:
+        bookId (str): 书籍的唯一标识符，用于从接口获取相关书籍的数据。
+
+    返回:
+        tuple: 返回两个元素
+            - d_sorted_chapters (list): 包含有想法的章节列表，每个元素为 (chapterUid, level, title)。
+            - sorted_thoughts (list): 包含每个章节的原文和想法数据，每个元素为 (chapterUid, [(position, abstract, content)])。
+                - 每个章节包含一个列表，列表中是按位置排序的 `(position, abstract, content)` 元组。
+    """
+    res = ''
+    """获取数据"""
+    if '_' in bookId:
+        url = 'https://i.weread.qq.com/review/list?listtype=6&mine=1&bookId=' + bookId + '&synckey=0&listmode=0'
+        data = request_data(url)
+        print('公众号暂时不支持获取想法')
+        return ''
+    else:
+        url = "https://i.weread.qq.com/review/list?bookId=" + bookId + "&listType=11&mine=1&synckey=0&listMode=0"
+        data = request_data(url)
+
+    # thoughts字典现在存储原文和想法绑定在一起
+    thoughts = defaultdict(list)
+    MAX = 1000000000
+    items = data['reviews']
+    for item in items:
+        if 'chapterUid' not in item['review']:
+            continue  # 跳过没有 chapterUid 的 item
+        # 获取想法所在章节id
+        chapterUid = item['review']['chapterUid']
+        # 获取原文内容
+        abstract = item['review']['abstract']
+        # 获取想法
+        text = item['review']['content']
+        # 获取想法开始位置
+        try:
+            text_position = int(item['review']['range'].split('-')[0])
+        except:
+            # 处理在章末添加想法的情况 (将位置设置为一个很大的值)
+            text_position = MAX + int(item['review']['createTime'])
+        
+        # 将原文和想法绑定，按位置存储
+        thoughts[chapterUid].append((text_position, abstract, text))
+
+    # 章节内原文和想法按位置排序
+    thoughts_sorted_range = defaultdict(list)
+    for chapterUid in thoughts.keys():
+        thoughts_sorted_range[chapterUid] = sorted(thoughts[chapterUid], key=lambda x: x[0])  # 按position排序
+
+    # 章节按id排序
+    sorted_thoughts = sorted(thoughts_sorted_range.items())
+    
+    # 获取包含目录级别的目录数据
+    # 获取包含目录级别的全书目录[(chapterUid, level, 'title')]
+    sorted_chapters = get_sorted_chapters(bookId)
+    # 去除没有想法的目录项
+    d_sorted_chapters = [chapter for chapter in sorted_chapters if chapter[0] in thoughts_sorted_range.keys()]
+    
+    return d_sorted_chapters, sorted_thoughts
+
+def are_sorted_contents_and_thoughts_empty(sorted_contents, sorted_thoughts):
+    """
+    判断 sorted_contents 和 sorted_thoughts 是否同时为空。
+    
+    参数:
+        - sorted_contents: dict, key 为 chapterUid，value 为书摘列表，每个书摘为 [text_position, style, markText]
+        - sorted_thoughts: list, 按章节包含原文和想法的排序信息，每个元素为 (chapterUid, [(position, abstract, content)])
+    
+    返回:
+        - bool: 如果 sorted_contents 和 sorted_thoughts 都为空，返回 True；否则返回 False
+    """
+    # 判断 sorted_contents 是否为空
+    contents_empty = not bool(sorted_contents)
+    
+    # 判断 sorted_thoughts 是否为空
+    thoughts_empty = not bool(sorted_thoughts)
+    
+    # 如果两个都为空，返回 True；否则返回 False
+    return contents_empty and thoughts_empty
+
+
