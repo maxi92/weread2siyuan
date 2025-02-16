@@ -376,8 +376,6 @@ def generate_markdown_table(new_book_info):
     # 增加封面图片行，使用动态路径
     markdown_str += f'| <strong>封面</strong> | ![封面]({cover_image_path}) |\n'
 
-
-
     # 遍历展示书籍信息
     for key, label in info_to_display:
         if key in new_book_info:
@@ -389,8 +387,7 @@ def generate_markdown_table(new_book_info):
             
             # 使第一列（标签）加粗，第二列（内容）变为斜体
             markdown_str += f'| <strong>{label}</strong> | {value} |\n'
-
-    print('**********************************************************')
+            
     logger.debug(markdown_str)
 
     return markdown_str

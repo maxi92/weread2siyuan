@@ -53,32 +53,59 @@ def initialize_token():
     global token
     token = local_token
 
-# 新增初始化笔记本名称的方法
 def initialize_notebook_name():
-    conf_file = os.getcwd() + "\\temp\\config.txt"
-    notebook_name = "读书笔记"
+    """
+    初始化配置文件中的笔记本名称。
+    如果 config.txt 中已有 "notebook_name=" 的键，则覆盖其值；否则新增该键。
     
-    # 读取conf.txt文件中的笔记本名称
+    返回:
+        None，配置直接写入 config.txt，同时全局变量 current_notebook_name 被更新。
+    """
+    import os
+    from collections import defaultdict
+
+    conf_file = os.path.join(os.getcwd(), "temp", "config.txt")
+    default_name = "读书笔记"
+    notebook_name = default_name
+
+    # 如果配置文件存在，读取其中的 notebook_name
     if os.path.exists(conf_file) and os.path.isfile(conf_file):
         with open(conf_file, 'r', encoding='utf-8') as f:
             for line in f:
                 if line.startswith('notebook_name='):
                     notebook_name = line.strip().split('notebook_name=')[1].strip()
                     if not notebook_name:
-                        notebook_name = "读书笔记"
+                        notebook_name = default_name
                     break
-    
+
     # 提示用户输入笔记本名称
     user_input = input(f"请输入存储读书笔记的笔记本名称（直接回车则为“{notebook_name}”）：").strip()
     if user_input:
         notebook_name = user_input
-        # 写入config.txt文件
-        with open(token_file, 'a', encoding='utf-8') as f:
-            f.write(f'\nnotebook_name={notebook_name}')
-    
-    # 将notebook_name赋值给全局变量
+        # 读取现有配置内容
+        lines = []
+        if os.path.exists(conf_file) and os.path.isfile(conf_file):
+            with open(conf_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            # 遍历所有行，查找 notebook_name 键并更新
+            found = False
+            for i, line in enumerate(lines):
+                if line.startswith('notebook_name='):
+                    lines[i] = f'notebook_name={notebook_name}\n'
+                    found = True
+                    break
+            if not found:
+                lines.append(f'notebook_name={notebook_name}\n')
+        else:
+            lines = [f'notebook_name={notebook_name}\n']
+        # 写回配置文件，覆盖原有内容
+        with open(conf_file, 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+
+    # 更新全局变量
     global current_notebook_name
     current_notebook_name = notebook_name
+
 
 
 def get_sync_mode_and_book_id():

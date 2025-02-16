@@ -183,19 +183,24 @@ def sync_books():
     if sync_mode == 3:
         bookshelf = {selected_book_id: 'title'}
 
+    bookshelf = {"674044":"title"}
+
     for book_id, title in bookshelf.items():
         book_info = get_bookinfo(book_id)
+
+        print('**********************************************************')
+        print("开始处理书籍：{}".format(book_info['title']))    
 
         cover = book_info['cover']
         book_info['cover_image_path'] = upload_image_from_url(cover)
         book_info_markdown = generate_markdown_table(book_info)
-        # print(book_info_markdown)
 
         sorted_chapters, sorted_contents = getChaptersAndContents(book_id)
 
         d_sorted_chapters, sorted_thoughts = get_mythought(book_id)
 
         if are_sorted_contents_and_thoughts_empty(sorted_contents, sorted_thoughts):
+            print("该书籍没有标注和想法，跳过处理")
             continue
 
         res = generate_markdown(sorted_chapters, sorted_contents, sorted_thoughts, is_all_chapter=0)
@@ -208,13 +213,13 @@ def sync_books():
         # 查找是否存在指定标题的笔记
         doc_info = search_docs_by_title(title)
         if doc_info:
-            # 检查书籍是否已完成
-            if sync_mode == 2 and book_info.get('finished', 0) == 1:
-                print(f"书籍 {book_info['title']} 已完成，跳过处理")
-                continue
             path = doc_info.get("path")
             box = doc_info.get("box")
             if path and box == notebook_id:
+                 # 检查书籍是否已完成
+                if sync_mode == 2 and book_info.get('finished', 0) == 1:
+                    print(f"书籍 {book_info['title']} 已标记“读完”并且已同步到思源笔记，跳过处理")
+                    continue
                 # 删除该笔记
                 remove_success = remove_doc(notebook_id, path)
                 if remove_success:
@@ -288,3 +293,11 @@ if __name__=='__main__':
     # 设置无限循环
     while True:
         sync_books()
+        print("")
+        print("")
+        print("")
+        print("同步完成！")
+        print("")
+        print("")
+        print("")
+
