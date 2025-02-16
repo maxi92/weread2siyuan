@@ -5,9 +5,113 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from collections import defaultdict
 
-
 # 预先设置好的token
-token = "your-token"
+token = None  # 这个值会在main.py中被覆盖
+token_file = os.getcwd() + "\\temp\\config.txt"
+current_notebook_name = None
+
+# 读取token文件
+def read_token_file():
+    if os.path.exists(token_file) and os.path.isfile(token_file):
+        with open(token_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('token='):
+                    token = line.strip().split('token=')[1]
+                    if token:
+                        return token
+    return None
+
+# 写入token文件
+def write_token_file(token):
+    with open(token_file, 'w', encoding='utf-8') as f:
+        f.write(f'token={token}')
+
+def initialize_token():
+    # 初始化token
+    local_token = read_token_file()
+    if not local_token:
+        while True:
+            local_token = input("请输入思源笔记token，可通过思源笔记的设置-关于-API token处获取：")
+            if not local_token:
+                print("思源笔记token为空！")
+            else:
+                write_token_file(local_token)
+                break
+
+    # 将local_token赋值给siyuan.py中的token变量
+    global token
+    token = local_token
+
+# 新增初始化笔记本名称的方法
+def initialize_notebook_name():
+    conf_file = os.getcwd() + "\\temp\\config.txt"
+    notebook_name = "读书笔记"
+    
+    # 读取conf.txt文件中的笔记本名称
+    if os.path.exists(conf_file) and os.path.isfile(conf_file):
+        with open(conf_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('notebook_name='):
+                    notebook_name = line.strip().split('notebook_name=')[1].strip()
+                    if not notebook_name:
+                        notebook_name = "读书笔记"
+                    break
+    
+    # 提示用户输入笔记本名称
+    user_input = input(f"请输入存储读书笔记的笔记本名称（直接回车则为“{notebook_name}”）：").strip()
+    if user_input:
+        notebook_name = user_input
+        # 写入config.txt文件
+        with open(token_file, 'a', encoding='utf-8') as f:
+            f.write(f'\nnotebook_name={notebook_name}')
+    
+    # 将notebook_name赋值给全局变量
+    global current_notebook_name
+    current_notebook_name = notebook_name
+
+
+def get_sync_mode_and_book_id():
+    """
+    获取用户选择的同步模式和书籍ID。
+
+    该方法会在终端打印同步模式选项，并等待用户输入。
+    根据用户的输入，它会设置sync_mode和selected_book_id的值，并在最后返回这两个值。
+    如果用户选择的是模式3，它还会要求用户输入书籍ID，并确保输入不为空。
+
+    返回:
+        - sync_mode (int): 用户选择的同步模式，1表示全量同步，2表示增量同步，3表示指定同步某一本书。
+        - selected_book_id (str): 如果用户选择了模式3，则为用户输入的书籍ID，否则为None。
+    """
+    sync_mode = None
+    selected_book_id = None
+
+    while sync_mode is None:
+        print("同步模式：")
+        print("按1：全量同步（对于所有书籍，每一次同步都会将前一次的笔记删除，以最新的内容创建新的笔记，故请注意不要在笔记中添加重要的内容）")
+        print("按2或直接回车：增量同步（对于未标记“读完”的书籍，每一次同步都会将前一次的笔记删除，以最新的内容创建新的笔记，故请注意不要在笔记中添加重要的内容；对于已经标记“读完”的书籍，若已经同步到思源笔记过，则后续不会再同步，可以放心在里面添加内容）")
+        print("按3：指定同步某一本书（选择该选项后，请输入书籍id，本应用会将该书前一次的笔记删除，以最新的内容创建新的笔记）")
+        print("请选择同步模式：", end="")
+        user_input = input().strip()
+
+        if user_input == '1':
+            sync_mode = 1
+        elif user_input in ('2', ''):
+            sync_mode = 2
+        elif user_input == '3':
+            sync_mode = 3
+        else:
+            print("同步模式选择有误，请重新输入！")
+
+    if sync_mode == 3:
+        while selected_book_id is None:
+            print("请输入书籍id:", end="")
+            book_id_input = input().strip()
+            if book_id_input:
+                selected_book_id = book_id_input
+            else:
+                print("书籍id输入有误，请重新输入！")
+
+    return sync_mode, selected_book_id
 
 """
 根据文档标题搜索文档。
@@ -95,7 +199,7 @@ def get_notebook_id_by_name():
             
             # 筛选出name为“读书笔记”的元素
             for notebook in notebooks:
-                if notebook.get("name") == "测试笔记本":
+                if notebook.get("name") == current_notebook_name:
                     return notebook.get("id", "")
             
             # 如果没有找到符合条件的元素，返回空字符串
@@ -128,7 +232,7 @@ def create_notebook():
     
     # 设置请求体
     body = {
-        "name": "测试笔记本"
+        "name": current_notebook_name
     }
     
     try:

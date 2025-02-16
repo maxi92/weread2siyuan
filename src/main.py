@@ -11,9 +11,8 @@ from siyuan import *
 
 # 微信读书用户id
 USERVID = 0
-# 文件路径
-file=''
 cookie_file = os.getcwd() + "\\temp\\cookie.txt"
+
 
 class MainWindow(QMainWindow):
 
@@ -166,6 +165,10 @@ if __name__=='__main__':
 
     print_welcome_message()
 
+    initialize_token()
+
+    initialize_notebook_name()
+
     bookId_dict = get_bookshelf(userVid=USERVID,list_as_shelf = False)
     print('**********************************************************')
     print_books_as_tree(userVid=USERVID)
@@ -173,10 +176,20 @@ if __name__=='__main__':
     # 获取所有书籍的id和title
     bookshelf = get_bookshelf(userVid=USERVID, list_as_shelf=False)
 
-    # 设置是否扫描所有书籍的标志，默认为0
-    scan_all = 1
+    sync_mode,selected_book_id = get_sync_mode_and_book_id()
 
-    bookshelf = {'3300089819':'title'};
+    # 查找是否存在笔记本，若不存在则创建
+    notebook_id = get_notebook_id_by_name()
+    if not notebook_id:
+        notebook_id = create_notebook()
+        if not notebook_id:
+            print("无法创建笔记本")
+            sys.exit(0)
+
+    
+
+    if(sync_mode == 3):
+        bookshelf = {selected_book_id:'title'};
 
     for book_id, title in bookshelf.items():
         book_info = get_bookinfo(book_id)
@@ -197,14 +210,6 @@ if __name__=='__main__':
 
         res = book_info_markdown + '\n' + res
 
-        # 查找是否存在笔记本，若不存在则创建
-        notebook_id = get_notebook_id_by_name()
-        if not notebook_id:
-            notebook_id = create_notebook()
-            if not notebook_id:
-                print("无法创建笔记本")
-                sys.exit(0)
-
         # 指定标题
         title = book_info["title"]
 
@@ -212,7 +217,7 @@ if __name__=='__main__':
         doc_info = search_docs_by_title(title)
         if doc_info:
             # 检查书籍是否已完成
-            if not scan_all and book_info.get('finished', 0) == 1:
+            if sync_mode == 2 and book_info.get('finished', 0) == 1:
                 print(f"书籍 {book_info['title']} 已完成，跳过处理")
                 continue
             path = doc_info.get("path")
@@ -257,8 +262,3 @@ if __name__=='__main__':
                 print(f"成功设置块属性，ID: {result['id']}")
             else:
                 print(f"设置块属性失败，ID: {result['id']}, 错误信息: {result['msg']}")
-
-    
-
-    
-                
