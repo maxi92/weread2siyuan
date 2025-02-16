@@ -183,7 +183,7 @@ def sync_books():
     if sync_mode == 3:
         bookshelf = {selected_book_id: 'title'}
 
-    bookshelf = {"674044":"title"}
+    #bookshelf = {"674044":"title"}
 
     for book_id, title in bookshelf.items():
         book_info = get_bookinfo(book_id)
