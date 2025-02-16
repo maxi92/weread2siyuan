@@ -4,6 +4,17 @@ import tempfile
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from collections import defaultdict
+import logging
+
+# 配置日志记录器
+logging.basicConfig(
+    level=logging.DEBUG,  # 设置最低日志级别
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename='app.log',   # 将日志写入文件而不是终端
+    filemode='a'          # 追加模式
+)
+
+logger = logging.getLogger(__name__)
 
 # 预先设置好的token
 token = None  # 这个值会在main.py中被覆盖
@@ -164,7 +175,7 @@ def search_docs_by_title(title):
             return {}  # 如果data为空数组或响应码不为0，返回空字典
     
     except requests.exceptions.RequestException as e:
-        print(f"请求失败: {e}")
+        logger.debug(f"请求失败: {e}")
         return {}
     
 """
@@ -208,7 +219,7 @@ def get_notebook_id_by_name():
             return ""  # 如果data为空或响应码不为0，返回空字符串
     
     except requests.exceptions.RequestException as e:
-        print(f"请求失败: {e}")
+        logger.debug(f"请求失败: {e}")
         return ""
     
 """
@@ -250,7 +261,7 @@ def create_notebook():
             return ""  # 如果data为空或响应码不为0，返回空字符串
     
     except requests.exceptions.RequestException as e:
-        print(f"请求失败: {e}")
+        logger.debug(f"请求失败: {e}")
         return ""
     
 """
@@ -294,7 +305,7 @@ def create_doc_with_md(notebook_id, book_name, md_content):
             return ""  # 如果data为空或响应码不为0，返回空字符串
     
     except requests.exceptions.RequestException as e:
-        print(f"请求失败: {e}")
+        logger.debug(f"请求失败: {e}")
         return ""
     
 """
@@ -461,7 +472,7 @@ def remove_doc_by_id(doc_id):
             return False  # 删除失败
         
     except requests.exceptions.RequestException as e:
-        print(f"请求失败: {e}")
+        logger.debug(f"请求失败: {e}")
         return False  # 请求异常，返回False
     
 def remove_doc(notebook_id, path):
@@ -503,7 +514,7 @@ def remove_doc(notebook_id, path):
             return False  # 删除失败
         
     except requests.exceptions.RequestException as e:
-        print(f"请求失败: {e}")
+        logger.debug(f"请求失败: {e}")
         return False  # 请求异常，返回False
     
 def get_doc_content(doc_id):
@@ -543,7 +554,7 @@ def get_doc_content(doc_id):
             return ""  # content为空或响应不符合预期，返回空字符串
         
     except requests.exceptions.RequestException as e:
-        print(f"请求失败: {e}")
+        logger.debug(f"请求失败: {e}")
         return ""  # 请求异常，返回空字符串
 
 def find_divs_with_tables(html: str) -> list:
@@ -601,7 +612,7 @@ def set_block_attributes_for_ids(id_array, width):
 
         except requests.exceptions.RequestException as e:
             # 请求异常时记录错误信息并继续下一个ID
-            print(f"请求失败 (ID: {block_id}): {e}")
+            logger.debug(f"请求失败 (ID: {block_id}): {e}")
             results.append({"id": block_id, "success": False, "msg": str(e)})
 
     return results
@@ -619,7 +630,7 @@ def upload_image_from_url(image_url):
     # 下载图片并保存到临时文件夹
     response = requests.get(image_url)
     if response.status_code != 200:
-        print(f"Failed to download image from {image_url}")
+        logger.debug(f"Failed to download image from {image_url}")
         return None
     
     # 创建临时文件
@@ -651,7 +662,7 @@ def upload_image_from_url(image_url):
                     # 返回第一个成功上传的文件路径
                     return next(iter(succ_map.values()))
             else:
-                print(f"Upload failed: {upload_response_json.get('msg')}")
+                logger.debug(f"Upload failed: {upload_response_json.get('msg')}")
                 return None
     finally:
         # 删除临时文件

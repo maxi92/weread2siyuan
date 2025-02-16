@@ -4,6 +4,17 @@ import sys
 import requests
 from collections import defaultdict
 from urllib3.exceptions import InsecureRequestWarning  # 直接从 urllib3 导入
+import logging
+
+# 配置日志记录器
+logging.basicConfig(
+    level=logging.DEBUG,  # 设置最低日志级别
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename='app.log',   # 将日志写入文件而不是终端
+    filemode='a'          # 追加模式
+)
+
+logger = logging.getLogger(__name__)
 
 # 禁用 InsecureRequestWarning 警告
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -380,7 +391,7 @@ def generate_markdown_table(new_book_info):
             markdown_str += f'| <strong>{label}</strong> | {value} |\n'
 
     print('**********************************************************')
-    print(markdown_str)
+    logger.debug(markdown_str)
 
     return markdown_str
 
