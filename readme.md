@@ -14,6 +14,9 @@ WeRead2SiYuan 是一个用于将微信读书的笔记和标注同步到思源笔
 - **日志记录**：详细的日志记录功能，帮助开发者调试和用户了解同步过程。📜
 
 ### 最终生成的笔记截图参考
+![Image text](https://github.com/maxi92/weread2siyuan/blob/master/readme/1.PNG)
+![Image text](https://github.com/maxi92/weread2siyuan/blob/master/readme/2.PNG)
+![Image text](https://github.com/maxi92/weread2siyuan/blob/master/readme/3.PNG)
 
 ## 使用技术栈
 - **编程语言**：Python 🐍
@@ -61,7 +64,7 @@ weread2siyuan/
 欢迎任何有兴趣的朋友参与贡献！如果您有任何问题或建议，请随时提交Issue或Pull Request。🤝
 
 ## 鸣谢
-本项目微信读书的登录功能、书摘和想法的解析部分代码参考了`https://github.com/Higurashi-kagome/pythontools`项目，在此特别感谢该项目。
+本项目微信读书的登录功能、书摘和想法的解析部分代码参考了<https://github.com/Higurashi-kagome/pythontools>项目，在此特别感谢该项目。
 
 ---
 
